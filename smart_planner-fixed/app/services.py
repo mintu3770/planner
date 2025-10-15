@@ -103,9 +103,9 @@ def generate_plan_from_llm(goal: str):
                                 "temperature": 0.3,
                                 "top_p": 0.9,
                                 "top_k": 40,
-                                "max_output_tokens": 512,
+                                "max_output_tokens": 256,
                             },
-                            request_options={"timeout": 25 + attempt * 15},
+                            request_options={"timeout": [45, 70, 90][attempt]},
                         )
                         output = response.text if hasattr(response, "text") else response.candidates[0].text
                         try:
