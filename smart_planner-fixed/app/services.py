@@ -15,7 +15,13 @@ try:
 except ImportError:
     genai = None
 
-FREE_TIER_MODELS = {"gemini-1.5-flash", "gemini-1.5-flash-8b"}
+FREE_TIER_MODELS = {"gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash-latest"}
+
+def _is_free_tier_model(name: str) -> bool:
+    if not name:
+        return False
+    short = name.split("/")[-1]
+    return short in FREE_TIER_MODELS or short.startswith("gemini-1.5-flash")
 
 
 def _resolve_supported_model(desired_model: str) -> str:
@@ -39,13 +45,17 @@ def _resolve_supported_model(desired_model: str) -> str:
                 if short:
                     available.append(short)
         # If desired is available, use it
-        if desired_model in available and desired_model in FREE_TIER_MODELS:
+        if desired_model in available and _is_free_tier_model(desired_model):
             return desired_model
         # Restrict fallback strictly to free-tier friendly models
-        free_tier_candidates = ["gemini-1.5-flash", "gemini-1.5-flash-8b"]
+        free_tier_candidates = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash-latest"]
         for candidate in free_tier_candidates:
             if candidate in available:
                 return candidate
+        # As a last attempt, find any model name that starts with gemini-1.5-flash
+        for a in available:
+            if a.startswith("gemini-1.5-flash"):
+                return a
         # Do not fall back to paid/experimental models
         return "gemini-1.5-flash"
     except Exception:
@@ -70,9 +80,10 @@ def generate_plan_from_llm(goal: str):
         f"Goal: {goal}\n"
     )
     if genai and GOOGLE_API_KEY:
-        genai.configure(api_key=GOOGLE_API_KEY)
+        # Force the stable v1 API to avoid v1beta 404s
+        genai.configure(api_key=GOOGLE_API_KEY, client_options={"api_version": "v1"})
         # Enforce allowlist even if provided secret/env is different
-        desired = GEMINI_MODEL if GEMINI_MODEL in FREE_TIER_MODELS else "gemini-1.5-flash"
+        desired = GEMINI_MODEL if _is_free_tier_model(GEMINI_MODEL) else "gemini-1.5-flash"
         model_name = _resolve_supported_model(desired)
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
