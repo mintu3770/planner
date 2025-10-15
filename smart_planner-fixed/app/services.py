@@ -5,13 +5,51 @@ import json
 try:
     import streamlit as st
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+    GEMINI_MODEL = st.secrets.get("GEMINI_MODEL", "gemini-1.5-flash")
 except Exception:
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 try:
     import google.generativeai as genai
 except ImportError:
     genai = None
+
+def _resolve_supported_model(desired_model: str) -> str:
+    """Return a supported model name. Falls back by listing available models.
+
+    The google-generativeai API returns names like "models/gemini-1.5-flash".
+    We normalize to the short form when constructing GenerativeModel.
+    """
+    if not genai:
+        raise RuntimeError("google-generativeai not installed")
+    try:
+        # List available models for the account/key
+        models = list(getattr(genai, "list_models")())
+        available = []
+        for m in models:
+            name = getattr(m, "name", "")
+            # keep only models that support generateContent
+            supported = getattr(m, "supported_generation_methods", [])
+            if "generateContent" in supported:
+                short = name.split("/")[-1] if name else ""
+                if short:
+                    available.append(short)
+        # If desired is available, use it
+        if desired_model in available:
+            return desired_model
+        # Prefer flash for lower latency, then pro, then first available
+        for candidate in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]:
+            if candidate in available:
+                return candidate
+        if available:
+            return available[0]
+    except Exception:
+        # Silent fallback if list_models not allowed
+        pass
+    # Last resort default
+    return desired_model
+
 
 def generate_plan_from_llm(goal: str):
     prompt = (
@@ -29,7 +67,8 @@ def generate_plan_from_llm(goal: str):
     )
     if genai and GOOGLE_API_KEY:
         genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel("gemini-pro")
+        model_name = _resolve_supported_model(GEMINI_MODEL)
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         output = response.text if hasattr(response, "text") else response.candidates[0].text
         try:
