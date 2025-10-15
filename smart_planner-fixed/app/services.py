@@ -56,7 +56,10 @@ def _resolve_supported_model(desired_model: str) -> str:
         for a in available:
             if a.startswith("gemini-1.5-flash"):
                 return a
-        # Do not fall back to paid/experimental models
+        # If no free-tier flash variant is available to your key/region,
+        # fall back to the first available generateContent-capable model to avoid 404s.
+        if available:
+            return available[0]
         return "gemini-1.5-flash"
     except Exception:
         # Silent fallback if list_models not allowed
