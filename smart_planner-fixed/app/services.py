@@ -80,8 +80,8 @@ def generate_plan_from_llm(goal: str):
         f"Goal: {goal}\n"
     )
     if genai and GOOGLE_API_KEY:
-        # Force the stable v1 API to avoid v1beta 404s
-        genai.configure(api_key=GOOGLE_API_KEY, client_options={"api_version": "v1"})
+        # Configure client with API key (no api_version option supported)
+        genai.configure(api_key=GOOGLE_API_KEY)
         # Enforce allowlist even if provided secret/env is different
         desired = GEMINI_MODEL if _is_free_tier_model(GEMINI_MODEL) else "gemini-1.5-flash"
         model_name = _resolve_supported_model(desired)
