@@ -102,8 +102,9 @@ def generate_plan_from_llm(goal: str):
                             generation_config={
                                 "temperature": 0.3,
                                 "top_p": 0.9,
-                                "top_k": 40,
-                                "max_output_tokens": 256,
+                                "top_k": 20,
+                                "max_output_tokens": 200,
+                                "response_mime_type": "application/json",
                             },
                             request_options={"timeout": [45, 70, 90][attempt]},
                         )
