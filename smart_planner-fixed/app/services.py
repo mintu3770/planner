@@ -38,8 +38,12 @@ def _resolve_supported_model(desired_model: str) -> str:
         # If desired is available, use it
         if desired_model in available:
             return desired_model
-        # Prefer flash for lower latency, then pro, then first available
-        for candidate in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]:
+        # Restrict fallback strictly to free-tier friendly models
+        free_tier_candidates = [
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+        ]
+        for candidate in free_tier_candidates:
             if candidate in available:
                 return candidate
         if available:
