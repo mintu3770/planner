@@ -15,6 +15,9 @@ try:
 except ImportError:
     genai = None
 
+FREE_TIER_MODELS = {"gemini-1.5-flash", "gemini-1.5-flash-8b"}
+
+
 def _resolve_supported_model(desired_model: str) -> str:
     """Return a supported model name. Falls back by listing available models.
 
@@ -36,23 +39,20 @@ def _resolve_supported_model(desired_model: str) -> str:
                 if short:
                     available.append(short)
         # If desired is available, use it
-        if desired_model in available:
+        if desired_model in available and desired_model in FREE_TIER_MODELS:
             return desired_model
         # Restrict fallback strictly to free-tier friendly models
-        free_tier_candidates = [
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-8b",
-        ]
+        free_tier_candidates = ["gemini-1.5-flash", "gemini-1.5-flash-8b"]
         for candidate in free_tier_candidates:
             if candidate in available:
                 return candidate
-        if available:
-            return available[0]
+        # Do not fall back to paid/experimental models
+        return "gemini-1.5-flash"
     except Exception:
         # Silent fallback if list_models not allowed
-        pass
-    # Last resort default
-    return desired_model
+        return "gemini-1.5-flash"
+    # Last resort default to free-tier model
+    return "gemini-1.5-flash"
 
 
 def generate_plan_from_llm(goal: str):
@@ -71,7 +71,9 @@ def generate_plan_from_llm(goal: str):
     )
     if genai and GOOGLE_API_KEY:
         genai.configure(api_key=GOOGLE_API_KEY)
-        model_name = _resolve_supported_model(GEMINI_MODEL)
+        # Enforce allowlist even if provided secret/env is different
+        desired = GEMINI_MODEL if GEMINI_MODEL in FREE_TIER_MODELS else "gemini-1.5-flash"
+        model_name = _resolve_supported_model(desired)
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         output = response.text if hasattr(response, "text") else response.candidates[0].text
