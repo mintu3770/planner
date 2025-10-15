@@ -88,11 +88,22 @@ def generate_plan_from_llm(goal: str):
         genai.configure(api_key=GOOGLE_API_KEY)
         # Build candidate list (auto-select free-tier), using GEMINI_MODEL only as a hint
         candidates = _list_free_tier_candidates(GEMINI_MODEL if _is_free_tier_model(GEMINI_MODEL) else "")
+        # Bias to lighter models for latency
+        candidates = sorted(set(candidates), key=lambda m: (0 if "flash-8b" in m else 1, m))
         last_error = None
         for model_name in candidates:
             try:
                 model = genai.GenerativeModel(model_name)
-                response = model.generate_content(prompt)
+                response = model.generate_content(
+                    prompt,
+                    generation_config={
+                        "temperature": 0.3,
+                        "top_p": 0.9,
+                        "top_k": 40,
+                        "max_output_tokens": 512,
+                    },
+                    request_options={"timeout": 20},
+                )
                 output = response.text if hasattr(response, "text") else response.candidates[0].text
                 try:
                     return json.loads(output)
